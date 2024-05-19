@@ -1,0 +1,30 @@
+python run_class_finetuning.py \
+        --model videomamba_tiny \
+        --data_path '/root/autodl-fs/renyu_kinetics-2' \
+	--prefix '/root/autodl-fs/renyu_kinetics-2' \
+        --data_set 'Kinetics_sparse' \
+        --split ',' \
+        --nb_classes 400 \
+        --log_dir "/root/autodl-tmp/videomamba_run/log" \
+        --output_dir "/root/autodl-tmp/videomamba_run/output" \
+        --batch_size 1 \
+        --num_sample 2 \
+        --input_size 224 \
+        --short_side_size 224 \
+        --save_ckpt_freq 100 \
+        --num_frames 8 \
+        --num_workers 1 \
+        --warmup_epochs 5 \
+        --tubelet_size 1 \
+        --epochs 7 \
+        --lr 2e-4 \
+        --drop_path 0.1 \
+        --aa rand-m5-n2-mstd0.25-inc1 \
+        --opt adamw \
+        --opt_betas 0.9 0.999 \
+        --weight_decay 0.1 \
+        --test_num_segment 4 \
+        --test_num_crop 3 \
+        --dist_eval \
+        --bf16
+

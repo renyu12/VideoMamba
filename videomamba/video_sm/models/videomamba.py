@@ -26,7 +26,7 @@ except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
 
-MODEL_PATH = 'your_model_path'
+MODEL_PATH = '/root/autodl-fs/videomamba_pretrain_models/'
 _MODELS = {
     "videomamba_t16_in1k": os.path.join(MODEL_PATH, "videomamba_t16_in1k_res224.pth"),
     "videomamba_s16_in1k": os.path.join(MODEL_PATH, "videomamba_s16_in1k_res224.pth"),
@@ -308,6 +308,8 @@ class VisionMamba(nn.Module):
         _load_weights(self, checkpoint_path, prefix)
 
     def forward_features(self, x, inference_params=None):
+        print(x.shape)
+        raise
         x = self.patch_embed(x)
         B, C, T, H, W = x.shape
         x = x.permute(0, 2, 3, 4, 1).reshape(B * T, H * W, C)
@@ -382,6 +384,7 @@ def inflate_weight(weight_2d, time_dim, center=True):
 
 
 def load_state_dict(model, state_dict, center=True):
+    state_dict = state_dict['model']
     state_dict_3d = model.state_dict()
     for k in state_dict.keys():
         if k in state_dict_3d.keys() and state_dict[k].shape != state_dict_3d[k].shape:
@@ -392,6 +395,7 @@ def load_state_dict(model, state_dict, center=True):
             time_dim = state_dict_3d[k].shape[2]
             state_dict[k] = inflate_weight(state_dict[k], time_dim, center=center)
     
+    #print('*****************',state_dict['model'].keys())
     del state_dict['head.weight']
     del state_dict['head.bias']
     msg = model.load_state_dict(state_dict, strict=False)

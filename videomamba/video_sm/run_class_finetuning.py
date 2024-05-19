@@ -689,7 +689,7 @@ def main(args, ds_init):
         ds=args.enable_deepspeed, no_amp=args.no_amp, bf16=args.bf16,
         maxk=5 if args.nb_classes >= 5 else 1
     )
-    torch.distributed.barrier()
+    #torch.distributed.barrier()
     if global_rank == 0:
         print("Start merging results...")
         final_top1 ,final_top5 = merge(args.output_dir, num_tasks)
