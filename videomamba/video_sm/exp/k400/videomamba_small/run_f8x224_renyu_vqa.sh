@@ -1,0 +1,30 @@
+python run_regression_finetuning.py \
+        --model videomamba_small \
+        --data_path '/root/autodl-fs/konvid1k' \
+        --prefix '/root/autodl-fs/konvid1k' \
+        --data_set 'Kinetics_sparse' \
+        --split ',' \
+        --finetune /root/autodl-fs/videomamba_pretrain_models/videomamba_s16_k400_f8_res224.pth \
+        --log_dir "/root/autodl-tmp/videomamba_vqa/log" \
+        --output_dir "/root/autodl-tmp/videomamba_vqa/output" \
+        --batch_size 4 \
+        --num_sample 2 \
+        --input_size 224 \
+        --short_side_size 224 \
+        --save_ckpt_freq 100 \
+        --num_frames 8 \
+        --num_workers 18 \
+        --warmup_epochs 5 \
+        --tubelet_size 1 \
+        --epochs 7 \
+        --lr 2e-4 \
+        --drop_path 0.35 \
+        --aa rand-m5-n2-mstd0.25-inc1 \
+        --opt adamw \
+        --opt_betas 0.9 0.999 \
+        --weight_decay 0.05 \
+        --test_num_segment 4 \
+        --test_num_crop 3 \
+        --dist_eval \
+        --delete_head \
+        --bf16

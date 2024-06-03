@@ -509,6 +509,10 @@ def main(args, ds_init):
     print("Model = %s" % str(model_without_ddp))
     print('number of params:', n_parameters)
 
+    # renyu: 冻结参数
+    #for param in model.parameters():  
+    #    param.requires_grad = False
+
     total_batch_size = args.batch_size * args.update_freq * utils.get_world_size()
     num_training_steps_per_epoch = len(dataset_train) // total_batch_size
     args.lr = args.lr * total_batch_size * args.num_sample / 256

@@ -194,6 +194,35 @@ class PatchEmbed(nn.Module):
         x = self.proj(x)
         return x
     
+class VQAHead(nn.Module):
+    """MLP Regression Head for VQA.
+    Args:
+        in_channels: input channels for MLP
+        hidden_channels: hidden channels for MLP
+        dropout_ratio: the dropout ratio for features before the MLP (default 0.5)
+    """
+
+    def __init__(
+        self, in_channels=768, hidden_channels=64, dropout_ratio=0.5, **kwargs
+    ):
+        super().__init__()
+        self.dropout_ratio = dropout_ratio
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        if self.dropout_ratio != 0:
+            self.dropout = nn.Dropout(p=self.dropout_ratio)
+        else:
+            self.dropout = None
+        self.fc_hid = nn.Conv3d(self.in_channels, self.hidden_channels, (1, 1, 1))
+        self.fc_last = nn.Conv3d(self.hidden_channels, 1, (1, 1, 1))
+        self.gelu = nn.GELU()
+
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
+
+    def forward(self, x, rois=None):
+        x = self.dropout(x)
+        qlt_score = self.fc_last(self.dropout(self.gelu(self.fc_hid(x))))
+        return qlt_score
 
 class VisionMamba(nn.Module):
     def __init__(
@@ -248,8 +277,9 @@ class VisionMamba(nn.Module):
         self.temporal_pos_embedding = nn.Parameter(torch.zeros(1, num_frames // kernel_size, embed_dim))
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        self.head_drop = nn.Dropout(fc_drop_rate) if fc_drop_rate > 0 else nn.Identity()
-        self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+        #self.head_drop = nn.Dropout(fc_drop_rate) if fc_drop_rate > 0 else nn.Identity()
+        #self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = VQAHead(in_channels=384)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         inter_dpr = [0.0] + dpr
@@ -366,7 +396,8 @@ class VisionMamba(nn.Module):
 
     def forward(self, x, inference_params=None):
         x = self.forward_features(x, inference_params)
-        x = self.head(self.head_drop(x))
+        #x = self.head(self.head_drop(x))
+        x = self.head(x)
         return x
 
 
