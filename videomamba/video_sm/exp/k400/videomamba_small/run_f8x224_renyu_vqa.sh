@@ -1,9 +1,10 @@
 python run_regression_finetuning.py \
         --model videomamba_small \
-        --data_path '/root/autodl-fs/konvid1k' \
-        --prefix '/root/autodl-fs/konvid1k' \
+        --data_path '/root/autodl-tmp/KoNViD-1k/' \
+        --prefix '/root/autodl-tmp/KoNViD-1k/KoNViD_1k_videos' \
         --data_set 'Kinetics_sparse' \
         --split ',' \
+	--nb_classes 1 \
         --finetune /root/autodl-fs/videomamba_pretrain_models/videomamba_s16_k400_f8_res224.pth \
         --log_dir "/root/autodl-tmp/videomamba_vqa/log" \
         --output_dir "/root/autodl-tmp/videomamba_vqa/output" \

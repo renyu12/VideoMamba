@@ -603,7 +603,7 @@ def main(args, ds_init):
             data_loader_test, model, device, preds_file, amp_autocast,
             ds=args.enable_deepspeed, no_amp=args.no_amp, bf16=args.bf16,
         )
-        torch.distributed.barrier()
+        #torch.distributed.barrier()
         if global_rank == 0:
             print("Start merging results...")
             final_loss = merge(args.output_dir, num_tasks)
@@ -684,7 +684,7 @@ def main(args, ds_init):
         data_loader_test, model, device, preds_file, amp_autocast,
         ds=args.enable_deepspeed, no_amp=args.no_amp, bf16=args.bf16,
     )
-    torch.distributed.barrier()
+    #torch.distributed.barrier()
     if global_rank == 0:
         print("Start merging results...")
         final_loss = merge(args.output_dir, num_tasks)

@@ -73,7 +73,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     model, samples, targets, criterion)
 
         loss_value = loss.item()
-
+        '''
         loss_list = [torch.zeros_like(loss) for _ in range(dist.get_world_size())]
         dist.all_gather(loss_list, loss)
         loss_list = torch.tensor(loss_list)
@@ -84,7 +84,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             print(" ========== loss_isnan = {},  loss_isinf = {} ========== ".format(loss_list_isnan, loss_list_isinf))
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(1)
-
+        '''
         if loss_scaler is None:
             loss /= update_freq
             model.backward(loss)

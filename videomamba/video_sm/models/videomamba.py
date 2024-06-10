@@ -213,8 +213,10 @@ class VQAHead(nn.Module):
             self.dropout = nn.Dropout(p=self.dropout_ratio)
         else:
             self.dropout = None
-        self.fc_hid = nn.Conv3d(self.in_channels, self.hidden_channels, (1, 1, 1))
-        self.fc_last = nn.Conv3d(self.hidden_channels, 1, (1, 1, 1))
+        #self.fc_hid = nn.Conv3d(self.in_channels, self.hidden_channels, (1, 1, 1))
+        #self.fc_last = nn.Conv3d(self.hidden_channels, 1, (1, 1, 1))
+        self.fc_hid = nn.Linear(self.in_channels, self.hidden_channels)
+        self.fc_last = nn.Linear(self.hidden_channels, 1)
         self.gelu = nn.GELU()
 
         self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
@@ -339,7 +341,7 @@ class VisionMamba(nn.Module):
 
     def forward_features(self, x, inference_params=None):
         print(x.shape)
-        raise
+        #raise
         x = self.patch_embed(x)
         B, C, T, H, W = x.shape
         x = x.permute(0, 2, 3, 4, 1).reshape(B * T, H * W, C)
