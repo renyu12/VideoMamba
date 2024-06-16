@@ -281,7 +281,7 @@ class VisionMamba(nn.Module):
 
         #self.head_drop = nn.Dropout(fc_drop_rate) if fc_drop_rate > 0 else nn.Identity()
         #self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
-        self.head = VQAHead(in_channels=384)
+        self.head = VQAHead(in_channels=self.embed_dim)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         inter_dpr = [0.0] + dpr
