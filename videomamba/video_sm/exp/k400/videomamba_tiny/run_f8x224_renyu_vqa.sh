@@ -1,7 +1,7 @@
 python run_regression_finetuning.py \
         --model videomamba_tiny \
-        --data_path '/root/autodl-tmp/KoNViD-1k/' \
-        --prefix '/root/autodl-tmp/KoNViD-1k/KoNViD_1k_videos' \
+        --data_path '/root/autodl-fs/KoNViD-1k/' \
+        --prefix '/root/autodl-fs/KoNViD-1k/KoNViD_1k_videos' \
         --data_set 'Kinetics_sparse' \
         --split ',' \
         --nb_classes 1 \

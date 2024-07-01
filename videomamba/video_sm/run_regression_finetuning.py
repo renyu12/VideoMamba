@@ -606,9 +606,9 @@ def main(args, ds_init):
         #torch.distributed.barrier()
         if global_rank == 0:
             print("Start merging results...")
-            final_loss = merge(args.output_dir, num_tasks)
+            final_loss, srocc, plcc, krocc = merge(args.output_dir, num_tasks)
             print(f"MSE Loss of the network on the {len(dataset_test)} test videos: {final_loss:.2f}")
-            log_stats = {'Final MSE Loss': final_loss}
+            log_stats = {'Final MSE Loss': final_loss, 'Final SROCC': srocc, 'Final PLCC': plcc, 'Final KROCC': krocc}
             if args.output_dir and utils.is_main_process():
                 with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                     f.write(json.dumps(log_stats) + "\n")
@@ -687,9 +687,9 @@ def main(args, ds_init):
     #torch.distributed.barrier()
     if global_rank == 0:
         print("Start merging results...")
-        final_loss = merge(args.output_dir, num_tasks)
+        final_loss, srocc, plcc, krocc = merge(args.output_dir, num_tasks)
         print(f"MSE Loss of the network on the {len(dataset_test)} test videos: {final_loss:.2f}")
-        log_stats = {'Final MSE Loss': final_loss}
+        log_stats = {'Final MSE Loss': final_loss, 'Final SROCC': srocc, 'Final PLCC': plcc, 'Final KROCC': krocc}
         if args.output_dir and utils.is_main_process():
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
