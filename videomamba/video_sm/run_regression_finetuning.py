@@ -162,7 +162,7 @@ def get_args():
     parser.add_argument('--trimmed', type=int, default=60)
     parser.add_argument('--time_stride', type=int, default=16)
     parser.add_argument('--data_set', default='Kinetics', choices=[
-        'Kinetics', 'Kinetics_sparse', 
+        'Kinetics', 'Kinetics_sparse', 'KoNViD_1k_fragment',
         'SSV2', 'UCF101', 'HMDB51', 'image_folder',
         'mitv1_sparse', 'LVU', 'COIN', 'Breakfast'
         ], type=str, help='dataset')

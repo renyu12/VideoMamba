@@ -391,3 +391,344 @@ def tensor_normalize(tensor, mean, std):
     tensor = tensor / std
     return tensor
 
+def get_spatial_fragments(
+    video,
+    fragments_h=7,
+    fragments_w=7,
+    fsize_h=32,
+    fsize_w=32,
+    aligned=8,
+    random_upsample=False,
+    fallback_type="upsample",
+    **kwargs,
+):
+    size_h = fragments_h * fsize_h
+    size_w = fragments_w * fsize_w
+    ## video: [C,T,H,W]
+    ## situation for images
+    if video.shape[1] == 1:
+        aligned = 1
+
+    dur_t, res_h, res_w = video.shape[-3:]
+    ratio = min(res_h / size_h, res_w / size_w)
+    if fallback_type == "upsample" and ratio < 1:
+        
+        ovideo = video
+        video = torch.nn.functional.interpolate(
+            video / 255.0, scale_factor=1 / ratio, mode="bilinear"
+        )
+        video = (video * 255.0).type_as(ovideo)
+        
+    if random_upsample:
+
+        randratio = random.random() * 0.5 + 1
+        video = torch.nn.functional.interpolate(
+            video / 255.0, scale_factor=randratio, mode="bilinear"
+        )
+        video = (video * 255.0).type_as(ovideo)
+
+    assert dur_t % aligned == 0, "Please provide match vclip and align index"
+    size = size_h, size_w
+
+    ## make sure that sampling will not run out of the picture
+    hgrids = torch.LongTensor(
+        [min(res_h // fragments_h * i, res_h - fsize_h) for i in range(fragments_h)]
+    )
+    wgrids = torch.LongTensor(
+        [min(res_w // fragments_w * i, res_w - fsize_w) for i in range(fragments_w)]
+    )
+    hlength, wlength = res_h // fragments_h, res_w // fragments_w
+
+    if hlength > fsize_h:
+        rnd_h = torch.randint(
+            hlength - fsize_h, (len(hgrids), len(wgrids), dur_t // aligned)
+        )
+    else:
+        rnd_h = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+    if wlength > fsize_w:
+        rnd_w = torch.randint(
+            wlength - fsize_w, (len(hgrids), len(wgrids), dur_t // aligned)
+        )
+    else:
+        rnd_w = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+
+    target_video = torch.zeros(video.shape[:-2] + size).to(video.device)
+
+    for i, hs in enumerate(hgrids):
+        for j, ws in enumerate(wgrids):
+            for t in range(dur_t // aligned):
+                t_s, t_e = t * aligned, (t + 1) * aligned
+                h_s, h_e = i * fsize_h, (i + 1) * fsize_h
+                w_s, w_e = j * fsize_w, (j + 1) * fsize_w
+                if random:
+                    h_so, h_eo = rnd_h[i][j][t], rnd_h[i][j][t] + fsize_h
+                    w_so, w_eo = rnd_w[i][j][t], rnd_w[i][j][t] + fsize_w
+                else:
+                    h_so, h_eo = hs + rnd_h[i][j][t], hs + rnd_h[i][j][t] + fsize_h
+                    w_so, w_eo = ws + rnd_w[i][j][t], ws + rnd_w[i][j][t] + fsize_w
+                target_video[:, t_s:t_e, h_s:h_e, w_s:w_e] = video[
+                    :, t_s:t_e, h_so:h_eo, w_so:w_eo
+                ]
+
+    return target_video
+
+class VideoClsDataset_fragment(Dataset):
+    """Load your own video classification dataset."""
+
+    def __init__(self, anno_path, prefix='', split=' ', mode='train', clip_len=8,
+                 frame_sample_rate=2, crop_size=224, short_side_size=256,
+                 new_height=256, new_width=340, keep_aspect_ratio=True,
+                 num_segment=1, num_crop=1, test_num_segment=10, test_num_crop=3,
+                 args=None):
+        self.anno_path = anno_path
+        self.prefix = prefix
+        self.split = split
+        self.mode = mode
+        self.clip_len = clip_len
+        self.frame_sample_rate = frame_sample_rate
+        self.crop_size = crop_size
+        self.short_side_size = short_side_size
+        self.new_height = new_height
+        self.new_width = new_width
+        self.keep_aspect_ratio = keep_aspect_ratio
+        self.num_segment = num_segment
+        self.test_num_segment = test_num_segment
+        self.num_crop = num_crop
+        self.test_num_crop = test_num_crop
+        self.args = args
+        self.aug = False
+
+        assert num_segment == 1
+        if self.mode in ['train']:
+            self.aug = True
+        if VideoReader is None:
+            raise ImportError("Unable to import `decord` which is required to read videos.")
+
+        import pandas as pd
+        cleaned = pd.read_csv(self.anno_path, header=None, delimiter=self.split)
+        self.dataset_samples = list(cleaned.values[:, 0])
+        self.label_array = list(cleaned.values[:, 1])
+
+        self.client = None
+        if has_client:
+            self.client = Client('~/petreloss.conf')
+
+        if (mode == 'train'):
+            pass
+
+        elif (mode == 'validation'):
+            self.data_transform = Compose([
+                #Resize(self.short_side_size, interpolation='bilinear'),
+                #CenterCrop(size=(self.crop_size, self.crop_size)),
+                ClipToTensor(),
+                Normalize(mean=[0.485, 0.456, 0.406],
+                                           std=[0.229, 0.224, 0.225])
+            ])
+        elif mode == 'test':
+            #self.data_resize = Compose([
+            #    Resize(size=(short_side_size), interpolation='bilinear')
+            #])
+            self.data_transform = Compose([
+                ClipToTensor(),
+                Normalize(mean=[0.485, 0.456, 0.406],
+                                           std=[0.229, 0.224, 0.225])
+            ])
+            self.test_seg = []
+            self.test_dataset = []
+            self.test_label_array = []
+            for ck in range(self.test_num_segment):
+                for cp in range(self.test_num_crop):
+                    for idx in range(len(self.label_array)):
+                        sample_label = self.label_array[idx]
+                        self.test_label_array.append(sample_label)
+                        self.test_dataset.append(self.dataset_samples[idx])
+                        self.test_seg.append((ck, cp))
+
+    def __getitem__(self, index):
+        if self.mode == 'train':
+            args = self.args 
+
+            sample = self.dataset_samples[index]
+            buffer = self.loadvideo_decord(sample, chunk_nb=-1) # T H W C
+            if len(buffer) == 0:
+                while len(buffer) == 0:
+                    warnings.warn("video {} not correctly loaded during training".format(sample))
+                    index = np.random.randint(self.__len__())
+                    sample = self.dataset_samples[index]
+                    buffer = self.loadvideo_decord(sample, chunk_nb=-1)
+
+            if args.num_sample > 1:
+                frame_list = []
+                label_list = []
+                index_list = []
+                for _ in range(args.num_sample):
+                    new_frames = self._aug_frame(buffer, args)
+                    label = self.label_array[index]
+                    frame_list.append(new_frames)
+                    label_list.append(label)
+                    index_list.append(index)
+                return frame_list, label_list, index_list, {}
+            else:
+                buffer = self._aug_frame(buffer, args)
+            
+            return buffer, self.label_array[index], index, {}
+
+        elif self.mode == 'validation':
+            sample = self.dataset_samples[index]
+            buffer = self.loadvideo_decord(sample, chunk_nb=0)
+            if len(buffer) == 0:
+                while len(buffer) == 0:
+                    warnings.warn("video {} not correctly loaded during validation".format(sample))
+                    index = np.random.randint(self.__len__())
+                    sample = self.dataset_samples[index]
+                    buffer = self.loadvideo_decord(sample, chunk_nb=0)
+            # renyu: 变换过程做了T H W C -> C T H W.
+            buffer = self.data_transform(buffer)
+            # renyu: transform已经转了，不需要再手动转了，T H W C -> C T H W.
+            #buffer = buffer.permute(3, 0, 1, 2)
+
+            # renyu: 训练集数据做网格采样
+            buffer = get_spatial_fragments(buffer)
+
+            return buffer, self.label_array[index], sample.split("/")[-1].split(".")[0]
+
+        elif self.mode == 'test':
+            sample = self.test_dataset[index]
+            chunk_nb, split_nb = self.test_seg[index]
+            buffer = self.loadvideo_decord(sample, chunk_nb=chunk_nb)
+
+            while len(buffer) == 0:
+                warnings.warn("video {}, temporal {}, spatial {} not found during testing".format(\
+                    str(self.test_dataset[index]), chunk_nb, split_nb))
+                index = np.random.randint(self.__len__())
+                sample = self.test_dataset[index]
+                chunk_nb, split_nb = self.test_seg[index]
+                buffer = self.loadvideo_decord(sample, chunk_nb=chunk_nb)
+
+            '''
+            buffer = self.data_resize(buffer)
+            if isinstance(buffer, list):
+                buffer = np.stack(buffer, 0)
+            if self.test_num_crop == 1:
+                spatial_step = 1.0 * (max(buffer.shape[1], buffer.shape[2]) - self.short_side_size) / 2
+                spatial_start = int(spatial_step)
+            else:
+                spatial_step = 1.0 * (max(buffer.shape[1], buffer.shape[2]) - self.short_side_size) \
+                                    / (self.test_num_crop - 1)
+                spatial_start = int(split_nb * spatial_step)
+            if buffer.shape[1] >= buffer.shape[2]:
+                buffer = buffer[:, spatial_start:spatial_start + self.short_side_size, :, :]
+            else:
+                buffer = buffer[:, :, spatial_start:spatial_start + self.short_side_size, :]
+            '''
+
+            # renyu: 变换之后通道换了，T H W C -> C T H W
+            buffer = self.data_transform(buffer)
+            # renyu: 不需要再手动转换了，T H W C -> C T H W.
+            #buffer = buffer.permute(3, 0, 1, 2)
+
+            # renyu: 训练集数据做网格采样
+            buffer = get_spatial_fragments(buffer)
+
+            return buffer, self.test_label_array[index], sample.split("/")[-1].split(".")[0], \
+                   chunk_nb, split_nb
+        else:
+            raise NameError('mode {} unkown'.format(self.mode))
+
+    def _aug_frame(
+        self,
+        buffer,
+        args,
+    ):
+
+        #aug_transform = create_random_augment(
+        #    input_size=(self.crop_size, self.crop_size),
+        #    auto_augment=args.aa,
+        #    interpolation=args.train_interpolation,
+        #)
+
+        buffer = [
+            transforms.ToPILImage()(frame) for frame in buffer
+        ]
+
+        #buffer = aug_transform(buffer)
+
+        buffer = [transforms.ToTensor()(img) for img in buffer] # renyu: [T*(H W C)] -> [T*(C H W)] (255->1) 
+        buffer = torch.stack(buffer) # [T*(C H W)] -> T C H W
+        buffer = buffer.permute(0, 2, 3, 1) # T C H W -> T H W C 
+        
+        # T H W C 
+        buffer = tensor_normalize(
+            buffer, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        )
+        # T H W C -> C T H W.
+        buffer = buffer.permute(3, 0, 1, 2)
+
+        # renyu: 训练集数据做网格采样
+        buffer = get_spatial_fragments(buffer)
+
+        return buffer
+
+    def _get_seq_frames(self, video_size, num_frames, clip_idx=-1):
+        seg_size = max(0., float(video_size - 1) / num_frames)
+        max_frame = int(video_size) - 1
+        seq = []
+        # index from 1, must add 1
+        if clip_idx == -1:
+            for i in range(num_frames):
+                start = int(np.round(seg_size * i))
+                end = int(np.round(seg_size * (i + 1)))
+                idx = min(random.randint(start, end), max_frame)
+                seq.append(idx)
+        else:
+            num_segment = 1
+            if self.mode == 'test':
+                num_segment = self.test_num_segment
+            duration = seg_size / (num_segment + 1)
+            for i in range(num_frames):
+                start = int(np.round(seg_size * i))
+                frame_index = start + int(duration * (clip_idx + 1))
+                idx = min(frame_index, max_frame)
+                seq.append(idx)
+        return seq
+
+    def loadvideo_decord(self, sample, chunk_nb=0):
+        """Load video content using Decord"""
+        fname = sample
+        fname = os.path.join(self.prefix, fname)
+
+        try:
+            if self.keep_aspect_ratio:
+                if "s3://" in fname:
+                    video_bytes = self.client.get(fname)
+                    vr = VideoReader(io.BytesIO(video_bytes),
+                                     num_threads=1,
+                                     ctx=cpu(0))
+                else:
+                    vr = VideoReader(fname, num_threads=1, ctx=cpu(0))
+            else:
+                if "s3://" in fname:
+                    video_bytes = self.client.get(fname)
+                    vr = VideoReader(io.BytesIO(video_bytes),
+                                     width=self.new_width,
+                                     height=self.new_height,
+                                     num_threads=1,
+                                     ctx=cpu(0))
+                else:
+                    vr = VideoReader(fname, width=self.new_width, height=self.new_height,
+                                    num_threads=1, ctx=cpu(0))
+
+            all_index = self._get_seq_frames(len(vr), self.clip_len, clip_idx=chunk_nb)
+            vr.seek(0)
+            buffer = vr.get_batch(all_index).asnumpy()
+            return buffer
+        except:
+            print("video cannot be loaded by decord: ", fname)
+            raise
+            #return []
+
+    def __len__(self):
+        if self.mode != 'test':
+            return len(self.dataset_samples)
+        else:
+            return len(self.test_dataset)

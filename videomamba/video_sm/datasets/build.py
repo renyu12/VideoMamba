@@ -8,7 +8,7 @@ from .masking_generator import (
 )
 from .mae import VideoMAE
 from .kinetics import VideoClsDataset
-from .kinetics_sparse import VideoClsDataset_sparse
+from .kinetics_sparse import VideoClsDataset_sparse, VideoClsDataset_fragment
 from .ssv2 import SSVideoClsDataset, SSRawFrameClsDataset
 from .lvu import LVU
 
@@ -98,7 +98,8 @@ def build_dataset(is_train, test_mode, args):
     if args.data_set in [
             'Kinetics',
             'Kinetics_sparse',
-            'mitv1_sparse'
+            'mitv1_sparse',
+            'KoNViD_1k_fragment'
         ]:
         mode = None
         anno_path = None
@@ -114,6 +115,8 @@ def build_dataset(is_train, test_mode, args):
 
         if 'sparse' in args.data_set:
             func = VideoClsDataset_sparse
+        if 'fragment' in args.data_set:
+            func = VideoClsDataset_fragment
         else:
             func = VideoClsDataset
 
